@@ -1,9 +1,9 @@
+from matplotlib.lines import Line2D
 import numpy as np
 import pandas as pd
 import os
 import json
 import matplotlib.pyplot as plt
-
 
 def load_df(file_path):
     """
@@ -20,7 +20,8 @@ def load_df(file_path):
     elif file_path.endswith('.json'):
         with open(file_path, 'r') as f:
             data = json.load(f)
-        return pd.DataFrame([data])
+        # return pd.DataFrame([data])
+        return data
 
 def save_df(df, file_path):
     """
@@ -397,6 +398,224 @@ def calculate_group_means_sr(sid_list, session_list, base_path):
     print(f"Group means plot saved to {plot_path}")
     plt.show()
 
+def plot_gui_sr_target_comp(sid_list, gui_session_list, sr_session_list, base_path):
+    """
+    - this will plot the number of sr reach targets reached by training block (y-axis) vs. the total number of GUI targets reached during sessions 1 and 2
+    - each participant will be a different color
+    - Marker Guide: 
+        - 'x' will be 3D training block 
+        - 'triangle' will be 6D training block
+        - 'o' will be Evaluation 
+        - '*' will be retention
+    """
+    gui_data = {}
+    sr_data = {}
+
+    for sid in sid_list:
+        gui_data[sid] = {}
+        sr_data[sid] = {}
+        # set the paths
+        sid_path = os.path.join(base_path, sid)
+
+
+        # Load in the GUI Session Data: 
+        for s in ['1', '2']:
+            gui_data[sid][s] = {}
+            # set the session path
+            session_path = os.path.join(sid_path,s)
+
+            # set the results path
+            results_path = os.path.join(session_path, 'results')
+
+            # get folders within the results path
+            date_dirs = [d for d in os.listdir(results_path) if os.path.isdir(os.path.join(results_path, d))]
+
+            for date in date_dirs:
+                # set the gui_analysis path
+                gui_analysis_path = os.path.join(results_path, date, 'gui_analysis')
+
+                # load in the gui_analysis data
+                if os.path.exists(gui_analysis_path):
+                    gui_file = os.path.join(gui_analysis_path, 'gui_analysis.json')
+                    gui_df = load_df(gui_file)
+                    gui_data[sid][s] = gui_df
+                else:
+                    print(f"GUI analysis path does not exist for {sid}, session {s}, date {date}")
+
+        # load in the SR Session Data: 
+        for s in sr_session_list:
+            sr_data[sid][s] = {}
+            # set the session path
+            session_path = os.path.join(sid_path,s)
+
+            # set the results path
+            results_path = os.path.join(session_path, 'results')
+
+            # get folders within the results path
+            date_dirs = [d for d in os.listdir(results_path) if os.path.isdir(os.path.join(results_path, d))]
+
+            for date in date_dirs:
+                # set the sr_analysis path
+                sr_analysis_path = os.path.join(results_path, date, 'sr_analysis')
+
+                # load in the sr_analysis data
+                if os.path.exists(sr_analysis_path):
+                    sr_file = os.path.join(sr_analysis_path, 'sr_task_metrics_sessions.json')
+                    sr_df = load_df(sr_file)
+                    sr_data[sid][s] = sr_df
+                else:
+                    print(f"SR analysis path does not exist for {sid}, session {s}, date {date}")
+
+
+    print(f"Loaded GUI Data: {gui_data.keys()}")
+    print(f"Loaded SR Data: {sr_data.keys()}")
+
+    # Define the Session Types: 
+    threeD_sessions = [str(s) for s in range(4, 7)]  # Sessions 4-6
+    sixD_sessions = [str(s) for s in range(7, 10)]  # Sessions 7-9
+    eval_session = ['10']
+    retention_session = ['11']
+
+    # Define the session markers
+    session_markers = {
+        '3D': 'D',
+        '6D': '^',
+        'Evaluation': 'o',
+        'Retention': '*'
+    }
+
+    # define session colors
+    session_colors = {
+        '3D': '#ff6fae',
+        '6D': '#a46de0',
+        'Evaluation': '#74c0fc',
+        'Retention': '#ffd43b'
+    }
+
+    # define the subject colors for the 10 participants: 
+    subject_colors = {
+        'I02': '#ff8fab',
+        'I06': '#c77dff',
+        'I07': '#ff6fae',
+        'I08': '#a46de0',
+        'I10': '#74c0fc',
+        'I12': '#4dabf7',
+        'I13': '#ff9e80',
+        'I14': '#ffd43b',
+        'I15': '#b197fc',
+        'I17': '#4dd4ac'
+    }
+
+    subject_markers = {
+        'I02': 'o',
+        'I06': 'x',
+        'I07': '^',
+        'I08': '*',
+        'I10': 's',
+        'I12': 'D',
+        'I13': 'P',
+        'I14': '2',
+        'I15': 'H',
+        'I17': 'd'
+    }
+
+    # define the figure, 3 subplots (3D, 6D, Evaluation)
+    fig, axes = plt.subplots(1, 3, figsize=(15, 8))
+
+    for sid in sid_list:
+        
+        # get the GUI data for the participant
+        gui_df = gui_data[sid]
+        print(f"gui_df: {gui_df['1']}")
+        total_gui_targets = gui_df['1']['target_metrics']['target_reaches'] + gui_df['2']['target_metrics']['target_reaches']
+
+        print(f'Total GUI Targets for {sid}: {total_gui_targets}')
+
+        # get the SR data for the participant
+        sr_df = sr_data[sid]
+
+        # get total number of targets for each different block type
+        threeD_total_targets = 0
+        sixD_total_targets = 0
+
+        for s in sr_session_list:
+            if s in threeD_sessions:
+                threeD_total_targets += sr_df[s]['reached_targets']
+
+            if s in sixD_sessions:
+                sixD_total_targets += sr_df[s]['reached_targets']
+
+            if s in eval_session:
+                eval_total_targets = sr_df[s]['reached_targets']
+
+            if s in retention_session:
+                retention_total_targets = sr_df[s]['reached_targets']
+
+        print(f'Total SR Targets for {sid}: {threeD_total_targets}, {sixD_total_targets}, {eval_total_targets}, {retention_total_targets}')
+
+        # Plotting the data, scatter
+
+        # plot the 3D training block 
+        axes[0].scatter(total_gui_targets, threeD_total_targets, color=subject_colors[sid], marker=session_markers['3D'], s=100, edgecolors='grey')
+
+        # plot the 6D training block
+        axes[1].scatter(total_gui_targets, sixD_total_targets, color=subject_colors[sid], marker=session_markers['6D'], s=100, edgecolors='grey')
+
+        # plot the evaluation block
+        axes[2].scatter(total_gui_targets, eval_total_targets, color=subject_colors[sid], marker=session_markers['Evaluation'], s=100, edgecolors='grey')
+
+        # plot the retention block
+        axes[2].scatter(total_gui_targets, retention_total_targets, color=subject_colors[sid], marker=session_markers['Retention'], s=100, edgecolors='grey')
+
+
+    # Define the Legend for Session Types
+    session_handles = [
+        Line2D([0], [0], marker=marker, color='black', label=session, markerfacecolor='white', markersize=10) for session, marker in session_markers.items()
+    ]
+
+    # Legend for participant IDs
+    subject_handles = [
+        Line2D([0], [0], marker= 'o', color='white', label=sid, markerfacecolor=subject_colors[sid], markersize=10) for sid in subject_colors.keys()
+    ]
+
+    # Add legends
+    legend1 = plt.legend(handles=session_handles, title='Session Type', loc='upper left', bbox_to_anchor=(1.0, 1))
+    plt.gca().add_artist(legend1)
+
+    plt.legend(handles=subject_handles, title='Participant ID', loc='upper left', bbox_to_anchor=(1.0, 0.5))
+
+    # Set Axes 0 Parameters: 
+    axes[0].set_xlabel('Total GUI Targets')
+    axes[0].set_ylabel('Total SR Targets')
+
+    axes[0].set_title('3D Training Block')
+    axes[0].set_xlim(-0.5, 250)
+    axes[0].set_ylim(-0.5, 55)
+
+    # Set Axes 1 Parameters: 
+    axes[1].set_xlabel('Total GUI Targets')
+    axes[1].set_ylabel('Total SR Targets')
+
+    axes[1].set_title('6D Training Block')
+    axes[1].set_xlim(-0.5, 250)
+    axes[1].set_ylim(-0.5, 10)
+
+    # Set Axes 2 Parameters:
+    axes[2].set_xlabel('Total GUI Targets')
+    axes[2].set_ylabel('Total SR Targets')
+
+    axes[2].set_title('Evaluation & Retention Block')
+    axes[2].set_xlim(-0.5, 250)
+    axes[2].set_ylim(-0.5, 10)
+
+    # save figure
+    save_path = data_path + 'group_results/gui_sr_target_comp_subplots.png'
+    plt.savefig(save_path)
+    # plt.close(fig)
+
+    # ax.legend()
+    plt.show()
+
 data_path = f'/home/r01_analysis_ws/data/'
 sid_list = ['I02', 'I06', 'I07', 'I08', 'I10', 'I12', 'I13', 'I14', 'I15', 'I17']
 gui_session_list = [str(s) for s in range(1, 12)]
@@ -404,4 +623,5 @@ sr_session_list = [str(s) for s in range(4, 12)]
 
 # call the function to calculate group means and plot results
 # calculate_group_means_gui(sid_list, gui_session_list, data_path)
-calculate_group_means_sr(sid_list, sr_session_list, data_path)
+# calculate_group_means_sr(sid_list, sr_session_list, data_path)
+plot_gui_sr_target_comp(sid_list, gui_session_list, sr_session_list, data_path)
