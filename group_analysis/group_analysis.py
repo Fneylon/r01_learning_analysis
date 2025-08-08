@@ -5,6 +5,7 @@ import os
 import json
 import matplotlib.pyplot as plt
 
+# Helper Functions
 def load_df(file_path):
     """
     Load a DataFrame from a CSV file.
@@ -29,6 +30,18 @@ def save_df(df, file_path):
     """
     df.to_csv(file_path, index=False)
     print(f"DataFrame saved to {file_path}")
+
+def calculate_average_over_block(data_df, block_size):
+    """
+    Calculate the average over a specified block size.
+
+    Arg: takes in a pandas dataframe 
+    """
+    # siphon off the data frame into blocks
+    num_blocks = len(data_df) // block_size
+    block_averages = []
+
+
 
 ### Data Analysis Functions ###
 
@@ -616,6 +629,108 @@ def plot_gui_sr_target_comp(sid_list, gui_session_list, sr_session_list, base_pa
     # ax.legend()
     plt.show()
 
+
+def plot_gui_target_time_response_time(sid_list, gui_session_list, base_path):
+    """
+    For the GUI Task, plotting the response time to the correct signal vs. the time it takes to get to the target.
+    Each participant is a different color
+    """
+    block_size = 12
+    
+    # define the subject colors for the 10 participants: 
+    subject_colors = {
+        'I02': '#ff8fab',
+        'I06': '#c77dff',
+        'I07': '#ff6fae',
+        'I08': '#a46de0',
+        'I10': '#74c0fc',
+        'I12': '#4dabf7',
+        'I13': '#ff9e80',
+        'I14': '#ffd43b',
+        'I15': '#b197fc',
+        'I17': '#4dd4ac'
+    }
+
+    subject_markers = {
+        'I02': 'o',
+        'I06': 'x',
+        'I07': '^',
+        'I08': '*',
+        'I10': 's',
+        'I12': 'D',
+        'I13': 'P',
+        'I14': '2',
+        'I15': 'H',
+        'I17': 'd'
+    }
+
+    # plot each participant on their own subfigure
+    fig, axes = plt.subplots(1, 1, figsize=(12, 8))
+
+    # Step 1: Calculate the average response time for each block 
+    for sid in sid_list:
+        
+        for s in gui_session_list:
+            print(f"Processing subject {sid}, session {s}")
+            
+            # set the results path
+            results_path = os.path.join(base_path,sid,s, 'results')
+            # print(f"Results path: {results_path}")
+
+            # get folders within the results path
+            date_dirs = [d for d in os.listdir(results_path) if os.path.isdir(os.path.join(results_path, d))]
+
+            for d in date_dirs:
+
+                # set the response time data file path
+                response_time_path = os.path.join(results_path, d, 'gui_analysis','response_time.csv')
+
+                # load in the response time data
+                response_time_data = pd.read_csv(response_time_path)
+
+                # load in the gui data
+                gui_df = pd.read_csv(os.path.join(base_path,sid,s,'processed_data', d, 'gui_task', '_gui_data.csv'))
+
+                # duration
+                duration_df = gui_df['duration']
+
+                # get the average duration by block
+                avg_duration_df = duration_df.groupby(np.arange(len(duration_df)) // block_size).mean()
+                # get rid of nan
+                avg_duration_df = avg_duration_df[~np.isnan(avg_duration_df)]
+                # save to a csv file in the results directory
+                avg_duration_df.to_csv(os.path.join(results_path, d, 'gui_analysis', 'avg_duration.csv'), index=False)
+
+                # Get the average response time for each block:
+                avg_df = response_time_data.groupby(np.arange(len(response_time_data)) // block_size).mean()
+                # save to a csv file in the results directory
+                avg_df.to_csv(os.path.join(results_path, d, 'gui_analysis', 'avg_response_time.csv'), index=False)
+
+                # print(f"Length of avg_df: {len(avg_df)}")
+                # print(f"Length of avg_duration_df: {len(avg_duration_df)}")
+
+
+                # Plot the data using scatter
+                axes.scatter(avg_df['response_time'], avg_duration_df, color=subject_colors[sid], marker=subject_markers[sid], s=100, edgecolors='grey', label=sid, alpha=0.7)
+
+    # Legend for participant IDs
+    subject_handles = [
+        Line2D([0], [0], marker= 'o', color='white', label=sid, markerfacecolor=subject_colors[sid], markersize=10) for sid in subject_colors.keys()
+    ]
+
+    # set the plot details: 
+    axes.set_xlabel('Average Response Time (seconds)', fontdict={'weight': 'bold', 'size': 12, 'family': 'Times New Roman'})
+    axes.set_ylabel('Average Trial Duration (seconds)', fontdict={'weight': 'bold', 'size': 12, 'family': 'Times New Roman'})
+    axes.set_title('GUI Task: Response Time vs Trial Duration', fontdict={'weight': 'bold', 'size': 14, 'family': 'Times New Roman'})
+    axes.set_xlim(0, 6)
+    axes.set_ylim(0, 16)
+    plt.legend(handles=subject_handles, title='Participant ID', loc='upper left', bbox_to_anchor=(1.0, 1))
+
+    # save figure to group analysis folder
+    plt.savefig(os.path.join(data_path, 'group_results', 'gui_metrics','response_time_vs_duration.png'))
+    plt.show()
+
+
 data_path = f'/home/r01_analysis_ws/data/'
 sid_list = ['I02', 'I06', 'I07', 'I08', 'I10', 'I12', 'I13', 'I14', 'I15', 'I17']
 gui_session_list = [str(s) for s in range(1, 12)]
@@ -624,4 +739,5 @@ sr_session_list = [str(s) for s in range(4, 12)]
 # call the function to calculate group means and plot results
 # calculate_group_means_gui(sid_list, gui_session_list, data_path)
 # calculate_group_means_sr(sid_list, sr_session_list, data_path)
-plot_gui_sr_target_comp(sid_list, gui_session_list, sr_session_list, data_path)
+# plot_gui_sr_target_comp(sid_list, gui_session_list, sr_session_list, data_path)
+plot_gui_target_time_response_time(sid_list, gui_session_list, data_path)
